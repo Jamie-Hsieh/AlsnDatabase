@@ -3,6 +3,10 @@ import json
 import sqlite3
 from datetime import datetime
 from flask import Flask, render_template, request, redirect
+from flask import Response
+import csv
+import io
+
 
 app = Flask(__name__)
 
@@ -86,6 +90,102 @@ ensure_db()
 @app.route("/")
 def home():
     return redirect("/report")
+
+from flask import Response
+import csv
+import io
+
+
+@app.route("/export")
+def export_csv():
+
+    filter_type = request.args.get("filter_type")
+    filter_date = request.args.get("filter_date")
+    search_query = request.args.get("search", "").strip()
+
+    sql = "SELECT * FROM entries"
+    params = []
+    conditions = []
+
+    has_timestamp = any(f["name"] == "timestamp" for f in CONFIG["fields"])
+
+    # date filter
+    if has_timestamp and filter_type and filter_date:
+        if filter_type == "before":
+            conditions.append("timestamp < ?")
+            params.append(filter_date)
+        elif filter_type == "after":
+            conditions.append("timestamp > ?")
+            params.append(filter_date)
+
+    # global search
+    if search_query:
+        search_conditions = []
+        for field in CONFIG["fields"]:
+            if field["type"] == "timestamp":
+                continue
+            name = field["name"]
+            search_conditions.append(f"LOWER({name}) LIKE LOWER(?)")
+            params.append(f"%{search_query}%")
+
+        conditions.append("(" + " OR ".join(search_conditions) + ")")
+
+    # field filters
+    for field in CONFIG["fields"]:
+        name = field["name"]
+        ftype = field.get("type", "text")
+        filter_val = request.args.get(f"filter_{name}")
+
+        if filter_val:
+            if ftype == "text":
+                conditions.append(f"LOWER({name}) LIKE LOWER(?)")
+                params.append(f"%{filter_val}%")
+            elif ftype in ["select", "date"]:
+                conditions.append(f"{name} = ?")
+                params.append(filter_val)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+
+    conn.close()
+
+    #ONLY include visible columns
+    visible_fields = [
+        f for f in CONFIG["fields"]
+        if request.args.get(f"show_{f['name']}")
+    ]
+
+    #fallback: if none selected, include all
+    if not visible_fields:
+        visible_fields = CONFIG["fields"]
+
+    # create CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # header
+    writer.writerow([f["label"] for f in visible_fields])
+
+    # rows
+    for row in rows:
+        writer.writerow([row[f["name"]] for f in visible_fields])
+
+    output.seek(0)
+
+    formatted_name = f"export_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={formatted_name}"}
+    )
+
 
 
 @app.route("/report", methods=["GET", "POST"])
