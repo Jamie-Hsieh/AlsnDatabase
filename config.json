@@ -1,0 +1,55 @@
+{
+    "fields": [
+        {
+            "name": "Dana_Claim",
+            "label": "Dana Claim",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Toro_Claim",
+            "label": "Toro Claim",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Accept_Deny",
+            "label": "Accept_Deny",
+            "type": "select",
+            "options": ["Accept", "Deny"],
+            "default": true
+        },
+        {
+            "name": "New_InProcess_Closed_WCF",
+            "label": "New_InProcess_Closed_WCF",
+            "type": "select",
+            "options": ["New", "In_Process", "Closed", "WCF"],
+            "default": true
+        },
+        {
+            "name": "Type",
+            "label": "Type",
+            "type": "select",
+            "options": ["deck", "drive"],
+            "default": true
+        },
+        {
+            "name": "Fail_Date",
+            "label": "Fail Date",
+            "type": "date",
+            "default": true
+        },
+        {
+            "name": "Serial",
+            "label": "Serial_Number",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "timestamp",
+            "label": "Timestamp",
+            "type": "timestamp",
+            "default": true
+        }
+    ]
+}

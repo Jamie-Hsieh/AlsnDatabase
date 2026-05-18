@@ -9,26 +9,28 @@
 
     <form method="GET">
 
-        <!-- Date filter -->
         <label>Filter by date:</label><br><br>
 
         <select name="filter_type">
             <option value="">No Filter</option>
-            <option value="before">Before</option>
-            <option value="after">After</option>
+            <option value="before" {% if filter_type == 'before' %}selected{% endif %}>Before</option>
+            <option value="after" {% if filter_type == 'after' %}selected{% endif %}>After</option>
         </select>
 
-        <input type="date" name="filter_date">
+        <input type="date" name="filter_date" value="{{ filter_date or '' }}">
 
         <br><br>
 
-        <!-- Checkbox toggles -->
         <label>Show fields:</label><br>
 
-        <input type="checkbox" name="show_A" {% if show_A %}checked{% endif %}> A<br>
-        <input type="checkbox" name="show_B" {% if show_B %}checked{% endif %}> B<br>
-        <input type="checkbox" name="show_C" {% if show_C %}checked{% endif %}> C<br>
-        <input type="checkbox" name="show_timestamp" {% if show_timestamp %}checked{% endif %}> Timestamp<br>
+        {% for field in fields %}
+            {% set param_name = 'show_' + field.name %}
+            <input type="checkbox"
+                   name="{{ param_name }}"
+                   value="on"
+                   {% if checkbox_states[field.name] %}checked{% endif %}>
+            {{ field.label }}<br>
+        {% endfor %}
 
         <br>
         <button type="submit">Apply</button>
@@ -39,11 +41,17 @@
     {% for e in entries %}
         <p>
             <strong>Entry:</strong><br>
-
-            {% if show_A %}A: {{ e["A"] }}<br>{% endif %}
-            {% if show_B %}B: {{ e["B"] }}<br>{% endif %}
-            {% if show_C %}C: {{ e["C"] }}<br>{% endif %}
-            {% if show_timestamp %}Time: {{ e["timestamp"] }}<br>{% endif %}
+            {% for field in fields %}
+                {% if checkbox_states[field.name] %}
+                    {{ field.label }}:
+                    {% if field.type == "date" %}
+                        {{ e[field.name][:10] }}
+                    {% else %}
+                        {{ e[field.name] }}
+                    {% endif %}
+                    <br>
+                {% endif %}
+            {% endfor %}
         </p>
         <hr>
     {% endfor %}
