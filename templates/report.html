@@ -84,11 +84,25 @@
         {% for e in entries %}
             <p>
                 <strong>Entry:</strong><br>
+
                 {% for field in fields %}
                     {% if checkbox_states[field.name] %}
-                        {{ field.label }}: {{ e[field.name] }}<br>
+
+                        {% if field.type == "image" and e[field.name] %}
+                            {{ field.label }}:<br>
+
+                            <a href="/{{ e[field.name] }}" target="_blank">
+                                <img src="/{{ e[field.name] }}" width="200">
+                            </a><br><br>
+
+                        {% else %}
+                            {{ field.label }}: {{ e[field.name] }}<br>
+
+                        {% endif %}
+
                     {% endif %}
                 {% endfor %}
+
             </p>
             <hr>
         {% endfor %}
@@ -100,7 +114,7 @@
 
         <h2>Enter New Record</h2>
 
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             {% for field in fields %}
                 {% if field.type != 'timestamp' %}
                     <label>{{ field.label }}:</label><br>
@@ -117,6 +131,11 @@
                                 <option value="{{ option }}">{{ option }}</option>
                             {% endfor %}
                         </select>
+
+                                                
+                    {% elif field.type == "image" %}
+                        <input type="file" name="{{ field.name }}">
+
                     {% endif %}
 
                     <br><br>

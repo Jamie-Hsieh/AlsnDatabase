@@ -2,8 +2,7 @@ import os
 import json
 import sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, redirect
-from flask import Response
+from flask import Flask, render_template, request, redirect, Response, send_from_directory
 import csv
 import io
 
@@ -13,9 +12,21 @@ app = Flask(__name__)
 DATA_DB = "data.db"
 CONFIG_FILE = "config.json"
 TEMPLATE_DIR = "templates"
+UPLOAD_FOLDER = "uploads"
 
 # -----------------------------
-# CONFIG & DB INITIALIZATION
+# SETUP DIRECTORIES
+# -----------------------------
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+if not os.path.exists(TEMPLATE_DIR):
+    os.makedirs(TEMPLATE_DIR)
+
+
+# -----------------------------
+# CONFIG INITIALIZATION
 # -----------------------------
 
 def ensure_config():
@@ -32,6 +43,7 @@ def ensure_config():
                     "default": True
                 },
                 {"name": "date_field", "label": "Date", "type": "date", "default": True},
+                {"name": "image_path", "label": "Image", "type": "image", "default": True},
                 {"name": "timestamp", "label": "Timestamp", "type": "timestamp", "default": True}
             ]
         }
@@ -41,8 +53,13 @@ def ensure_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
+
 CONFIG = ensure_config()
 
+
+# -----------------------------
+# DATABASE FUNCTIONS
+# -----------------------------
 
 def get_db_connection():
     conn = sqlite3.connect(DATA_DB)
@@ -74,27 +91,30 @@ def ensure_db():
     conn.close()
 
 
-# -----------------------------
-# AUTO-CREATE TEMPLATES
-# -----------------------------
-
-if not os.path.exists(TEMPLATE_DIR):
-    os.makedirs(TEMPLATE_DIR)
-
 ensure_db()
 
+
 # -----------------------------
-# ROUTES
+# FILE SERVING (IMAGES)
+# -----------------------------
+
+@app.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+# -----------------------------
+# HOME
 # -----------------------------
 
 @app.route("/")
 def home():
     return redirect("/report")
 
-from flask import Response
-import csv
-import io
 
+# -----------------------------
+# EXPORT CSV
+# -----------------------------
 
 @app.route("/export")
 def export_csv():
@@ -109,7 +129,6 @@ def export_csv():
 
     has_timestamp = any(f["name"] == "timestamp" for f in CONFIG["fields"])
 
-    # date filter
     if has_timestamp and filter_type and filter_date:
         if filter_type == "before":
             conditions.append("timestamp < ?")
@@ -118,7 +137,6 @@ def export_csv():
             conditions.append("timestamp > ?")
             params.append(filter_date)
 
-    # global search
     if search_query:
         search_conditions = []
         for field in CONFIG["fields"]:
@@ -130,7 +148,6 @@ def export_csv():
 
         conditions.append("(" + " OR ".join(search_conditions) + ")")
 
-    # field filters
     for field in CONFIG["fields"]:
         name = field["name"]
         ftype = field.get("type", "text")
@@ -155,45 +172,45 @@ def export_csv():
 
     conn.close()
 
-    #ONLY include visible columns
     visible_fields = [
         f for f in CONFIG["fields"]
         if request.args.get(f"show_{f['name']}")
     ]
 
-    #fallback: if none selected, include all
     if not visible_fields:
         visible_fields = CONFIG["fields"]
 
-    # create CSV
     output = io.StringIO()
     writer = csv.writer(output)
 
-    # header
     writer.writerow([f["label"] for f in visible_fields])
 
-    # rows
     for row in rows:
         writer.writerow([row[f["name"]] for f in visible_fields])
 
     output.seek(0)
 
-    formatted_name = f"export_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    filename = f"export_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
     return Response(
         output,
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={formatted_name}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
+# -----------------------------
+# REPORT + INSERT
+# -----------------------------
 
 @app.route("/report", methods=["GET", "POST"])
 def report():
 
+    # ---------- INSERT ----------
     if request.method == "POST":
         values = {}
 
+        # handle normal fields
         for field in CONFIG["fields"]:
             name = field["name"]
             ftype = field.get("type", "text")
@@ -206,6 +223,19 @@ def report():
                 if val not in field.get("options", []):
                     val = ""
                 values[name] = val
+
+            elif ftype == "image":
+                file = request.files.get(name)
+                image_path = ""
+
+                if file and file.filename != "":
+                    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+                    file.save(filepath)
+                    image_path = f"uploads/{filename}"
+
+                values[name] = image_path
 
             else:
                 values[name] = request.form.get(name, "")
@@ -222,6 +252,8 @@ def report():
         conn.close()
 
         return redirect("/report")
+
+    # ---------- FILTERING ----------
 
     filter_type = request.args.get("filter_type")
     filter_date = request.args.get("filter_date")
@@ -261,10 +293,7 @@ def report():
             if ftype == "text":
                 conditions.append(f"LOWER({name}) LIKE LOWER(?)")
                 params.append(f"%{filter_val}%")
-            elif ftype == "select":
-                conditions.append(f"{name} = ?")
-                params.append(filter_val)
-            elif ftype == "date":
+            elif ftype in ["select", "date"]:
                 conditions.append(f"{name} = ?")
                 params.append(filter_val)
 
@@ -305,6 +334,10 @@ def report():
         filter_date=filter_date
     )
 
+
+# -----------------------------
+# RUN APP
+# -----------------------------
 
 if __name__ == "__main__":
     app.run(debug=True)

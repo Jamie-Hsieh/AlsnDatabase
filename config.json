@@ -45,6 +45,10 @@
             "type": "text",
             "default": true
         },
+        {"name": "image_path", 
+        "label": "Image", 
+        "type": "image", 
+        "default": true},
         {
             "name": "timestamp",
             "label": "Timestamp",
