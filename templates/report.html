@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Report</title>
+</head>
+<body>
+    <h1>Report</h1>
+
+    <form method="GET">
+
+        <!-- Date filter -->
+        <label>Filter by date:</label><br><br>
+
+        <select name="filter_type">
+            <option value="">No Filter</option>
+            <option value="before">Before</option>
+            <option value="after">After</option>
+        </select>
+
+        <input type="date" name="filter_date">
+
+        <br><br>
+
+        <!-- Checkbox toggles -->
+        <label>Show fields:</label><br>
+
+        <input type="checkbox" name="show_A" {% if show_A %}checked{% endif %}> A<br>
+        <input type="checkbox" name="show_B" {% if show_B %}checked{% endif %}> B<br>
+        <input type="checkbox" name="show_C" {% if show_C %}checked{% endif %}> C<br>
+        <input type="checkbox" name="show_timestamp" {% if show_timestamp %}checked{% endif %}> Timestamp<br>
+
+        <br>
+        <button type="submit">Apply</button>
+    </form>
+
+    <hr>
+
+    {% for e in entries %}
+        <p>
+            <strong>Entry:</strong><br>
+
+            {% if show_A %}A: {{ e["A"] }}<br>{% endif %}
+            {% if show_B %}B: {{ e["B"] }}<br>{% endif %}
+            {% if show_C %}C: {{ e["C"] }}<br>{% endif %}
+            {% if show_timestamp %}Time: {{ e["timestamp"] }}<br>{% endif %}
+        </p>
+        <hr>
+    {% endfor %}
+</body>
+</html>
+        
