@@ -50,7 +50,6 @@ def ensure_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Create table if it doesn't exist
     field_defs = ", ".join([f'{f["name"]} TEXT' for f in CONFIG["fields"]])
     cur.execute(f"""
         CREATE TABLE IF NOT EXISTS entries (
@@ -59,15 +58,13 @@ def ensure_db():
         )
     """)
 
-    # Get existing columns
     cur.execute("PRAGMA table_info(entries)")
     existing_cols = {row["name"] for row in cur.fetchall()}
 
-    # Add missing columns
     for field in CONFIG["fields"]:
         name = field["name"]
         if name not in existing_cols:
-            cur.execute(f"ALTER TABLE entries ADD COLUMN {name} TEXT")
+            cur.execute(f'ALTER TABLE entries ADD COLUMN "{name}" TEXT')
 
     conn.commit()
     conn.close()
@@ -80,57 +77,9 @@ def ensure_db():
 if not os.path.exists(TEMPLATE_DIR):
     os.makedirs(TEMPLATE_DIR)
 
-# ---------- INDEX TEMPLATE ----------
-index_html = os.path.join(TEMPLATE_DIR, "index.html")
-if not os.path.exists(index_html):
-    with open(index_html, "w") as f:
-        f.write("""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Data Entry</title>
-</head>
-<body>
-    <h1>Enter New Record</h1>
-
-    <form method="POST">
-        {% for field in fields %}
-            {% if field.type != 'timestamp' %}
-                <label>{{ field.label }}:</label><br>
-
-                {% if field.type == "text" %}
-                    <input type="text" name="{{ field.name }}">
-
-                {% elif field.type == "date" %}
-                    <input type="date" name="{{ field.name }}">
-
-                {% elif field.type == "select" %}
-                    <select name="{{ field.name }}">
-                        {% for option in field.options %}
-                            <option value="{{ option }}">{{ option }}</option>
-                        {% endfor %}
-                    </select>
-
-                {% endif %}
-
-                <br><br>
-            {% endif %}
-        {% endfor %}
-
-        <button type="submit">Confirm</button>
-    </form>
-
-    <br><br>
-
-    <a href="/report"><button type="button">Generate Report</button></a>
-</body>
-</html>
-        """)
-
-# ---------- REPORT TEMPLATE ----------
 report_html = os.path.join(TEMPLATE_DIR, "report.html")
 if not os.path.exists(report_html):
-    with open(report_html, "w") as f:
+    with open(report_html, "w", encoding="utf-8") as f:
         f.write("""
 <!DOCTYPE html>
 <html>
@@ -138,56 +87,149 @@ if not os.path.exists(report_html):
     <title>Report</title>
 </head>
 <body>
-    <h1>Report</h1>
 
-    <form method="GET">
+<h1>Report</h1>
 
-        <label>Filter by date:</label><br><br>
+<div style="display: flex; gap: 40px; align-items: flex-start;">
 
-        <select name="filter_type">
-            <option value="">No Filter</option>
-            <option value="before" {% if filter_type == 'before' %}selected{% endif %}>Before</option>
-            <option value="after" {% if filter_type == 'after' %}selected{% endif %}>After</option>
-        </select>
+    <!-- LEFT SIDE -->
+    <div style="flex: 2;">
 
-        <input type="date" name="filter_date" value="{{ filter_date or '' }}">
+        <form method="GET">
 
-        <br><br>
+            <label>Search:</label><br>
+            <input type="text" name="search" value="{{ request.args.get('search', '') }}">
+            <br><br>
 
-        <label>Show fields:</label><br>
+            <label>Filter by date:</label><br><br>
 
-        {% for field in fields %}
-            {% set param_name = 'show_' + field.name %}
-            <input type="checkbox"
-                   name="{{ param_name }}"
-                   value="on"
-                   {% if checkbox_states[field.name] %}checked{% endif %}>
-            {{ field.label }}<br>
+            <select name="filter_type">
+                <option value="">No Filter</option>
+                <option value="before" {% if filter_type == 'before' %}selected{% endif %}>Before</option>
+                <option value="after" {% if filter_type == 'after' %}selected{% endif %}>After</option>
+            </select>
+
+            <input type="date" name="filter_date" value="{{ filter_date or '' }}">
+
+            <br><br>
+
+            <label>Show & Filter Fields:</label><br>
+
+            {% for field in fields %}
+                {% set checkbox_name = 'show_' + field.name %}
+                {% set filter_name = 'filter_' + field.name %}
+
+                <input type="checkbox"
+                       name="{{ checkbox_name }}"
+                       value="on"
+                       {% if checkbox_states[field.name] %}checked{% endif %}>
+
+                {{ field.label }}
+
+                {% if field.type == "text" %}
+                    <input type="text" name="{{ filter_name }}" value="{{ request.args.get(filter_name, '') }}">
+
+                {% elif field.type == "select" %}
+                    <select name="{{ filter_name }}">
+                        <option value="">--Any--</option>
+                        {% for option in field.options %}
+                            <option value="{{ option }}"
+                                {% if request.args.get(filter_name) == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                {% elif field.type == "date" %}
+                    <input type="date" name="{{ filter_name }}" value="{{ request.args.get(filter_name, '') }}">
+                {% endif %}
+
+                <br><br>
+            {% endfor %}
+
+            <button type="submit">Apply</button>
+
+            <br><br>
+
+            <button type="button" onclick="checkAll()">Check All</button>
+            <button type="button" onclick="uncheckAll()">Uncheck All</button>
+            <button type="button" onclick="resetForm()">Reset Fields</button>
+
+        </form>
+
+        <hr>
+
+        {% for e in entries %}
+            <p>
+                <strong>Entry:</strong><br>
+                {% for field in fields %}
+                    {% if checkbox_states[field.name] %}
+                        {{ field.label }}: {{ e[field.name] }}<br>
+                    {% endif %}
+                {% endfor %}
+            </p>
+            <hr>
         {% endfor %}
 
-        <br>
-        <button type="submit">Apply</button>
-    </form>
+    </div>
 
-    <hr>
+    <!-- RIGHT SIDE -->
+    <div style="flex: 1; border-left: 1px solid #ccc; padding-left: 20px;">
 
-    {% for e in entries %}
-        <p>
-            <strong>Entry:</strong><br>
+        <h2>Enter New Record</h2>
+
+        <form method="POST">
             {% for field in fields %}
-                {% if checkbox_states[field.name] %}
-                    {{ field.label }}:
-                    {% if field.type == "date" %}
-                        {{ e[field.name][:10] }}
-                    {% else %}
-                        {{ e[field.name] }}
+                {% if field.type != 'timestamp' %}
+                    <label>{{ field.label }}:</label><br>
+
+                    {% if field.type == "text" %}
+                        <input type="text" name="{{ field.name }}">
+
+                    {% elif field.type == "date" %}
+                        <input type="date" name="{{ field.name }}">
+
+                    {% elif field.type == "select" %}
+                        <select name="{{ field.name }}">
+                            {% for option in field.options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
                     {% endif %}
-                    <br>
+
+                    <br><br>
                 {% endif %}
             {% endfor %}
-        </p>
-        <hr>
-    {% endfor %}
+
+            <button type="submit">Add Entry</button>
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+
+function checkAll() {
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = true;
+    });
+}
+
+function uncheckAll() {
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+}
+
+function resetForm() {
+    const form = document.querySelector('form');
+    form.reset();
+    window.location.href = "/report";
+}
+
+</script>
+
 </body>
 </html>
         """)
@@ -198,8 +240,14 @@ ensure_db()
 # ROUTES
 # -----------------------------
 
-@app.route("/", methods=["GET", "POST"])
-def index():
+@app.route("/")
+def home():
+    return redirect("/report")
+
+
+@app.route("/report", methods=["GET", "POST"])
+def report():
+
     if request.method == "POST":
         values = {}
 
@@ -227,53 +275,64 @@ def index():
         sql = f"INSERT INTO entries ({columns}) VALUES ({placeholders})"
 
         cur.execute(sql, list(values.values()))
-
         conn.commit()
         conn.close()
 
-        return redirect("/")
+        return redirect("/report")
 
-    return render_template("index.html", fields=CONFIG["fields"])
-
-
-@app.route("/report")
-def report():
     filter_type = request.args.get("filter_type")
     filter_date = request.args.get("filter_date")
+    search_query = request.args.get("search", "").strip()
 
-    
     sql = "SELECT * FROM entries"
     params = []
     conditions = []
-
 
     has_timestamp = any(f["name"] == "timestamp" for f in CONFIG["fields"])
 
     if has_timestamp and filter_type and filter_date:
         if filter_type == "before":
-            sql += " WHERE timestamp < ?"
+            conditions.append("timestamp < ?")
             params.append(filter_date)
         elif filter_type == "after":
-            sql += " WHERE timestamp > ?"
+            conditions.append("timestamp > ?")
             params.append(filter_date)
 
-    search_query = request.args.get("search")
-
-    if search_query: #search bar
+    if search_query:
         search_conditions = []
         for field in CONFIG["fields"]:
+            if field["type"] == "timestamp":
+                continue
             name = field["name"]
-            search_conditions.append(f"{name} LIKE ?")
+            search_conditions.append(f"LOWER({name}) LIKE LOWER(?)")
             params.append(f"%{search_query}%")
 
         conditions.append("(" + " OR ".join(search_conditions) + ")")
+
+    for field in CONFIG["fields"]:
+        name = field["name"]
+        ftype = field.get("type", "text")
+        filter_val = request.args.get(f"filter_{name}")
+
+        if filter_val:
+            if ftype == "text":
+                conditions.append(f"LOWER({name}) LIKE LOWER(?)")
+                params.append(f"%{filter_val}%")
+            elif ftype == "select":
+                conditions.append(f"{name} = ?")
+                params.append(filter_val)
+            elif ftype == "date":
+                conditions.append(f"{name} = ?")
+                params.append(filter_val)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
     cur.execute(sql, params)
     rows = cur.fetchall()
-
     conn.close()
 
     entries = []
@@ -283,26 +342,16 @@ def report():
             entry[field["name"]] = row[field["name"]]
         entries.append(entry)
 
-    
     checkbox_states = {}
-
-    # Check if ANY checkbox parameters were submitted
-    has_checkbox_params = any(
-        key.startswith("show_") for key in request.args
-    )
+    form_submitted = len(request.args) > 0
 
     for field in CONFIG["fields"]:
         param_name = f"show_{field['name']}"
 
-        if not has_checkbox_params:
-            # First load → use config defaults (yours are True)
+        if not form_submitted:
             checkbox_states[field["name"]] = field.get("default", True)
         else:
-            # After form submission:
-            # checkbox is ON only if it appears in the request
             checkbox_states[field["name"]] = (param_name in request.args)
-
-
 
     return render_template(
         "report.html",
@@ -313,10 +362,6 @@ def report():
         filter_date=filter_date
     )
 
-
-# -----------------------------
-# RUN APP
-# -----------------------------
 
 if __name__ == "__main__":
     app.run(debug=True)
