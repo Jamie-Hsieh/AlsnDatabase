@@ -13,44 +13,92 @@
             "default": true
         },
         {
-            "name": "Accept_Deny",
-            "label": "Accept_Deny",
-            "type": "select",
-            "options": ["Accept", "Deny"],
-            "default": true
-        },
-        {
-            "name": "New_InProcess_Closed_WCF",
-            "label": "New_InProcess_Closed_WCF",
-            "type": "select",
-            "options": ["New", "In_Process", "Closed", "WCF"],
-            "default": true
-        },
-        {
-            "name": "Type",
-            "label": "Type",
-            "type": "select",
-            "options": ["deck", "drive"],
-            "default": true
-        },
-        {
-            "name": "Fail_Date",
-            "label": "Fail Date",
-            "type": "date",
-            "default": true
-        },
-        {
-            "name": "Serial",
-            "label": "Serial_Number",
+            "name": "Exmark_Claim",
+            "label": "Exmark Claim",
             "type": "text",
             "default": true
         },
-        {"name": "image_path", 
+        {
+            "name": "Evaluation",
+            "label": "Evaluation",
+            "type": "select",
+            "options": ["Other","Accept", "Reject"],
+            "default": true
+        },
+        {
+            "name": "NICW",
+            "label": "NICW",
+            "type": "select",
+            "options": ["Other","N","I","C","W"],
+            "default": true
+        },
+        {
+            "name": "Model",
+            "label": "Model",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Motor_Serial_Number",
+            "label": "Motor Serial Number",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Motor_Type",
+            "label": "Motor Type",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Failure_Date",
+            "label": "Failure Date",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Issue",
+            "label": "Issue",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "DOA_Hours",
+            "label": "DOA Hours",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "ICA_Status",
+            "label": "ICA Status",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Root_Cause",
+            "label": "Root Cause",
+            "type": "text",
+            "default": true
+        },
+        {
+            "name": "Location",
+            "label": "Location",
+            "type": "select",
+            "options": ["Other","WCF","Maumee","Lafayette"],
+            "default": true
+        },
+        {
+            "name": "Action",
+            "label": "Action",
+            "type": "text",
+            "default": true
+        },
+        {"name": "Image", 
         "label": "Image", 
         "type": "image", 
         "default": true},
         {
-            "name": "timestamp",
+            "name": "Timestamp",
             "label": "Timestamp",
             "type": "timestamp",
             "default": true
